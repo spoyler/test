@@ -180,34 +180,36 @@ int main(int argc, const char* argv[])
 							// get file diff
 							std::stringstream unpacked_data;
 							std::ifstream my_file(file_path.c_str(), std::ios::in | std::ios::binary);
-							if (unpack_data(my_file, unpacked_data) != Z_OK)
+							if (unpack_data(my_file, unpacked_data) == Z_OK)
+							{
+								std::string current_line;
+								decltype(file_map) updated_file_map;
+								while (getline(unpacked_data, current_line))
+								{
+									auto line_hash = std::hash<std::string>()(current_line);
+
+									const auto same_line = file_map.find(line_hash);
+									if (same_line != file_map.end())
+									{
+										file_map.erase(same_line);
+									}
+									else
+									{
+										std::cout << "+" << current_line << "\r\n";
+									}
+									updated_file_map.emplace(line_hash, std::move(current_line));
+								}
+
+								for (const auto& line : file_map)
+									std::cout << "-" << line.second << "\r\n";
+
+								file_map.swap(updated_file_map);
+							}
+							else
 							{
 								file_map.clear();
 								std::cerr << "File was updated, but ZLib can't unpack it" << "\r\n";
-								continue;
 							}
-							std::string current_line;
-							decltype(file_map) updated_file_map;
-							while (getline(unpacked_data, current_line))
-							{
-								auto line_hash = std::hash<std::string>()(current_line);
-
-								const auto same_line = file_map.find(line_hash);
-								if (same_line != file_map.end())
-								{
-									file_map.erase(same_line);
-								}
-								else
-								{
-									std::cout << "+" << current_line << "\r\n";
-								}
-								updated_file_map.emplace(line_hash, std::move(current_line));
-							}
-
-							for (const auto& line : file_map)
-								std::cout << "-" << line.second << "\r\n";
-
-							file_map.swap(updated_file_map);
 						}
 					}
 					else
@@ -216,17 +218,18 @@ int main(int argc, const char* argv[])
 						//  only read file
 						std::ifstream my_file(file_path.c_str(), std::ios::in | std::ios::binary);
 						std::stringstream unpacked_data;
-						if (unpack_data(my_file, unpacked_data) != Z_OK)
+						if (unpack_data(my_file, unpacked_data) == Z_OK)
+						{
+							// read unpacked data
+							std::string current_line;
+							while (getline(unpacked_data, current_line))
+							{
+								file_map.emplace(std::hash<std::string>()(current_line), std::move(current_line));
+							}
+						}
+						else
 						{
 							std::cerr << "Zlib unpack error" << "\r\n";
-							continue;
-						}
-
-						// read unpacked data
-						std::string current_line;
-						while (getline(unpacked_data, current_line))
-						{
-							file_map.emplace(std::hash<std::string>()(current_line), std::move(current_line));
 						}
 					}
 				}
